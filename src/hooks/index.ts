@@ -5,3 +5,4 @@
  */
 
 export * from "./httpClient";
+export { default as Provider } from "./provider";

@@ -1,6 +1,6 @@
 export { store } from "./store";
 export type { RootState, AppDispatch } from "./store";
-export { default as StoreProvider } from "./provider";
+export { default as StoreProvider } from "../hooks/store-provider";
 
 export { default as authReducer, setToken, clearError as clearAuthError } from "./slices/auth.slice";
 export { default as usersReducer, clearUser, clearError as clearUsersError } from "./slices/users.slice";
