@@ -7,7 +7,7 @@ import type { RootState } from "../store";
  * Stores the JWT in localStorage so it survives page refreshes.
  * On logout or token clear, the key is removed.
  */
-const TOKEN_KEY = "automiq_token";
+export const TOKEN_KEY = "automiq_token";
 
 function loadToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -33,12 +33,14 @@ function saveToken(token: string | null) {
 
 type AuthState = {
   token: string | null;
+  hydrated: boolean;
   status: "idle" | "loading" | "succeeded" | "failed";
   error?: string;
 };
 
 const initialState: AuthState = {
-  token: loadToken(),
+  token: null,
+  hydrated: false,
   status: "idle",
 };
 
@@ -56,6 +58,9 @@ const authSlice = createSlice({
     setToken(state, action: PayloadAction<string | null>) {
       state.token = action.payload;
       saveToken(action.payload);
+    },
+    setHydrated(state, action: PayloadAction<boolean>) {
+      state.hydrated = action.payload;
     },
     clearError(state) {
       state.error = undefined;
@@ -79,6 +84,6 @@ const authSlice = createSlice({
   },
 });
 
-export const { setToken, clearError } = authSlice.actions;
+export const { setToken, setHydrated, clearError } = authSlice.actions;
 
 export default authSlice.reducer;

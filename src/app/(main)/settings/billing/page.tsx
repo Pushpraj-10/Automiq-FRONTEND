@@ -21,44 +21,51 @@ export default function BillingPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <Card className="bg-indigo-950/20 border-indigo-900/50 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+    <div className="w-full space-y-6">
+      <Card className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#0e0e0e]/90 text-white shadow-xl">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#FACC15]/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         <CardHeader>
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-start">
             <div className="space-y-2">
-              <CardTitle className="text-2xl flex items-center gap-2 text-indigo-100">
-                <CreditCard className="w-5 h-5 text-indigo-400" /> Current Plan: Pro Trial
+              <CardTitle className="text-2xl font-extrabold tracking-[-0.4px] flex items-center gap-2 text-white">
+                <CreditCard className="w-5 h-5 text-yellow-400" /> Current Plan: Pro Trial
               </CardTitle>
-              <CardDescription className="text-indigo-200/60">
+              <CardDescription className="text-[#a0a0a0] font-medium">
                 Your trial expires in 12 days. Upgrade to retain access to premium features.
               </CardDescription>
             </div>
-            <div className="bg-indigo-900/40 border border-indigo-700/50 text-indigo-300 px-3 py-1 text-xs font-semibold rounded-full uppercase tracking-wider">
+            <div className="bg-[#FACC15]/10 border border-yellow-400/20 text-yellow-300 px-3 py-1 text-xs font-extrabold rounded-full uppercase tracking-wider">
               Trialing
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 relative z-10">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-black/20 rounded-lg p-4 border border-indigo-900/30">
-              <div className="text-3xl font-bold text-white mb-1">2,341 <span className="text-sm font-normal text-indigo-200/60">/ 5,000</span></div>
-              <div className="text-xs uppercase tracking-wider text-indigo-300">Tasks Executed (Month)</div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="bg-black/20 rounded-xl p-4 border border-white/10">
+              <div className="text-3xl font-black text-white mb-1">2,341 <span className="text-sm font-normal text-neutral-500">/ 5,000</span></div>
+              <div className="text-xs uppercase tracking-wider text-neutral-400 font-bold">Tasks Executed (Month)</div>
             </div>
-            <div className="bg-black/20 rounded-lg p-4 border border-indigo-900/30">
-              <div className="text-3xl font-bold text-white mb-1">12 <span className="text-sm font-normal text-indigo-200/60">/ Unlimited</span></div>
-              <div className="text-xs uppercase tracking-wider text-indigo-300">Active Workflows</div>
+            <div className="bg-black/20 rounded-xl p-4 border border-white/10">
+              <div className="text-3xl font-black text-white mb-1">12 <span className="text-sm font-normal text-neutral-500">/ Unlimited</span></div>
+              <div className="text-xs uppercase tracking-wider text-neutral-400 font-bold">Active Workflows</div>
+            </div>
+            <div className="bg-black/20 rounded-xl p-4 border border-white/10 sm:col-span-2 lg:col-span-1">
+              <div className="text-3xl font-black text-white mb-1">99.4%</div>
+              <div className="text-xs uppercase tracking-wider text-neutral-400 font-bold">Execution Success</div>
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end gap-3 border-t border-indigo-900/30 pt-6">
-          <Button variant="outline" className="border-indigo-800 bg-transparent text-indigo-300 hover:bg-indigo-900/50">
+        <CardFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 border-t border-white/5 pt-6">
+          <Button
+            variant="outline"
+            className="h-11 rounded-xl border-white/15 bg-transparent px-5 text-neutral-200 font-semibold tracking-[0.1px] transition-all duration-200 hover:bg-white/8 hover:border-white/25 hover:text-white active:translate-y-0"
+          >
             Manage Subscription
           </Button>
           <Button
             onClick={() => handleUpgrade("price_pro")}
             disabled={billingStatus === "loading"}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/20"
+            className="h-11 rounded-xl bg-[#FACC15] px-5 text-black font-extrabold tracking-[0.1px] shadow-[0_12px_28px_rgba(250,204,21,0.22)] transition-all duration-200 hover:bg-[#ffe066] hover:shadow-[0_16px_32px_rgba(250,204,21,0.3)] disabled:bg-[#FACC15]/80 disabled:text-black/70 disabled:opacity-100 active:translate-y-0"
           >
             {billingStatus === "loading" ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Upgrade to Pro
@@ -66,11 +73,11 @@ export default function BillingPage() {
         </CardFooter>
       </Card>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card className="bg-neutral-900 border-neutral-800 text-white">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="bg-[#0e0e0e]/90 border-white/5 text-white rounded-2xl shadow-xl">
           <CardHeader>
-            <CardTitle>Free Plan</CardTitle>
-            <div className="text-3xl font-bold mt-2">$0 <span className="text-sm font-normal text-neutral-500">/mo</span></div>
+            <CardTitle className="text-xl font-bold">Free Plan</CardTitle>
+            <div className="text-3xl font-black mt-2">$0 <span className="text-sm font-normal text-neutral-500">/mo</span></div>
           </CardHeader>
           <CardContent className="space-y-4">
             <ul className="space-y-3">
@@ -80,24 +87,26 @@ export default function BillingPage() {
                 "Standard Integrations",
                 "Community Support"
               ].map((feature, i) => (
-                <li key={i} className="flex items-center text-sm text-neutral-300">
+                <li key={i} className="flex items-center text-sm text-neutral-300 font-medium">
                   <Check className="w-4 h-4 mr-3 text-neutral-500" /> {feature}
                 </li>
               ))}
             </ul>
           </CardContent>
           <CardFooter>
-            <Button variant="outline" className="w-full border-neutral-700 bg-neutral-800 text-neutral-300">Downgrade</Button>
+            <Button
+              variant="outline"
+              className="h-11 w-full rounded-xl border-white/15 bg-transparent text-neutral-300 font-semibold transition-all duration-200 hover:bg-white/8 hover:border-white/25 hover:text-white active:translate-y-0"
+            >
+              Downgrade
+            </Button>
           </CardFooter>
         </Card>
 
-        <Card className="bg-neutral-900 border-indigo-500/50 text-white relative">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
-            MOST POPULAR
-          </div>
+        <Card className="bg-[#0e0e0e]/90 border-yellow-400/30 text-white relative rounded-2xl shadow-[0_12px_36px_rgba(250,204,21,0.08)]">
           <CardHeader>
-            <CardTitle>Pro Plan</CardTitle>
-            <div className="text-3xl font-bold mt-2">$29 <span className="text-sm font-normal text-neutral-500">/mo</span></div>
+            <CardTitle className="text-xl font-bold">Pro Plan</CardTitle>
+            <div className="text-3xl font-black mt-2">$29 <span className="text-sm font-normal text-neutral-500">/mo</span></div>
           </CardHeader>
           <CardContent className="space-y-4">
             <ul className="space-y-3">
@@ -108,14 +117,16 @@ export default function BillingPage() {
                 "Priority Email Support",
                 "1 min polling interval"
               ].map((feature, i) => (
-                <li key={i} className="flex items-center text-sm text-neutral-200">
-                  <Check className="w-4 h-4 mr-3 text-indigo-400" /> {feature}
+                <li key={i} className="flex items-center text-sm text-neutral-200 font-medium">
+                  <Check className="w-4 h-4 mr-3 text-yellow-400" /> {feature}
                 </li>
               ))}
             </ul>
           </CardContent>
           <CardFooter>
-            <Button className="w-full bg-white text-black hover:bg-neutral-200">Current Plan</Button>
+            <Button className="h-11 w-full rounded-xl bg-[#FACC15] text-black font-extrabold tracking-[0.1px] shadow-[0_10px_24px_rgba(250,204,21,0.22)] transition-all duration-200 hover:bg-[#ffe066] hover:shadow-[0_14px_30px_rgba(250,204,21,0.3)] active:translate-y-0">
+              Current Plan
+            </Button>
           </CardFooter>
         </Card>
       </div>

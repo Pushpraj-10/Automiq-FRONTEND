@@ -16,16 +16,16 @@ function LoginFormContent() {
   };
 
   return (
-    <div className="flex flex-col space-y-6">
-      <div className="space-y-2 text-center">
-        <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
-        <p className="text-sm text-neutral-400">
+    <div className="flex flex-col space-y-8">
+      <div className="space-y-3 text-center">
+        <h1 className="text-[32px] font-extrabold tracking-[-1px] text-white leading-tight">Welcome back</h1>
+        <p className="text-[15px] text-[#777] font-medium">
           Sign in to your account to continue
         </p>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-md px-4 py-3 text-center">
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl px-4 py-3 text-center font-medium">
           {error === "auth_failed"
             ? "Authentication failed. Please try again."
             : error === "invalid_token"
@@ -36,12 +36,12 @@ function LoginFormContent() {
 
       <Button
         variant="outline"
-        className="w-full bg-white text-black hover:bg-neutral-200 border-neutral-300 flex space-x-2"
+        className="w-full bg-white text-black hover:bg-neutral-100 border-none rounded-full h-[52px] font-bold text-[14px] flex items-center justify-center space-x-3 transition-all duration-200 hover:-translate-y-1 shadow-[0_8px_20px_rgba(255,255,255,0.15)] mt-4"
         onClick={handleLogin}
         disabled={isLoading}
       >
         {isLoading ? (
-          <div className="h-4 w-4 border-2 border-black border-r-transparent rounded-full animate-spin" />
+          <div className="h-5 w-5 border-2 border-black border-r-transparent rounded-full animate-spin" />
         ) : (
           <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -53,8 +53,8 @@ function LoginFormContent() {
         <span>Continue with Google</span>
       </Button>
 
-      <div className="text-center text-xs text-neutral-500">
-        By continuing, you agree to our Terms of Service and Privacy Policy.
+      <div className="text-center text-[11px] text-[#555] tracking-[0.5px] max-w-[280px] mx-auto leading-relaxed mt-6">
+        By continuing, you agree to our <span className="text-[#888] cursor-pointer hover:text-white transition-colors">Terms of Service</span> and <span className="text-[#888] cursor-pointer hover:text-white transition-colors">Privacy Policy</span>.
       </div>
     </div>
   );
