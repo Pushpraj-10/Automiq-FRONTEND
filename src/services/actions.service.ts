@@ -43,6 +43,9 @@ export function upsertWorkflowAction(
     config: Record<string, unknown>;
     onFailure?: Record<string, unknown>;
     isActive?: boolean;
+    nodeId?: string;
+    position?: { x: number; y: number };
+    editorMeta?: Record<string, unknown>;
   },
 ) {
   if (!token) throw new Error("auth token is required");

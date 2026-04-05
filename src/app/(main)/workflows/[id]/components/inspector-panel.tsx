@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +17,28 @@ const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"
 const DELAY_UNITS = ["seconds", "minutes", "hours", "days"] as const;
 
 type DelayUnit = (typeof DELAY_UNITS)[number];
+
+const PANEL_INPUT_CLASS =
+  "my-0 h-10 border-white/15 bg-[#181818] px-3 text-neutral-100 placeholder:text-neutral-500 transition-colors hover:border-white/25 focus-visible:border-[#facc15]/45 focus-visible:ring-2 focus-visible:ring-[#facc15]/20";
+
+const PANEL_SELECT_TRIGGER_CLASS =
+  "my-0 w-full rounded-xl border-white/15 bg-[#181818] px-3.5 text-neutral-100 data-[size=default]:h-10 data-placeholder:text-neutral-500 transition-colors hover:border-white/25 hover:bg-[#1c1c1c] focus-visible:border-[#facc15]/45 focus-visible:ring-2 focus-visible:ring-[#facc15]/20";
+
+const PANEL_SELECT_CONTENT_CLASS =
+  "w-auto min-w-[max(14rem,var(--anchor-width))] rounded-xl border border-white/15 bg-[#121212]/98 p-1.5 text-neutral-100 shadow-[0_18px_44px_rgba(0,0,0,0.55)] ring-1 ring-black/35 backdrop-blur-sm";
+
+const PANEL_SELECT_ITEM_CLASS =
+  "cursor-pointer rounded-lg py-2 pl-2.5 pr-8 text-sm font-medium leading-5 text-neutral-100 focus:bg-white/10 focus:text-neutral-100 data-[highlighted]:bg-white/10 data-[state=checked]:bg-white/10 data-[state=checked]:text-neutral-100 data-[state=checked]:font-semibold";
+
+const PANEL_TEXTAREA_CLASS =
+  "w-full resize-none rounded-lg border border-white/15 bg-[#181818] px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-500 transition-colors hover:border-white/25 focus-visible:border-[#facc15]/45 focus-visible:ring-2 focus-visible:ring-[#facc15]/20";
+
+const PANEL_SELECT_CONTENT_PROPS = {
+  side: "bottom" as const,
+  align: "start" as const,
+  sideOffset: 8,
+  alignItemWithTrigger: false,
+};
 
 type InspectorPanelProps = {
   selectedNode?: WorkflowNode;
@@ -163,6 +185,77 @@ function normalizeFailureStrategy(input: unknown): "retry" | "stop" | "continue"
   return "retry";
 }
 
+type NumberInputWithStepperProps = {
+  value: number;
+  min?: number;
+  fallback: number;
+  ariaLabel: string;
+  onChange: (value: number) => void;
+};
+
+function NumberInputWithStepper({
+  value,
+  min = 1,
+  fallback,
+  ariaLabel,
+  onChange,
+}: NumberInputWithStepperProps) {
+  const normalizedValue = Number.isFinite(value) ? Math.max(min, value) : fallback;
+
+  const commit = (nextValue: number) => {
+    if (!Number.isFinite(nextValue)) {
+      onChange(fallback);
+      return;
+    }
+
+    onChange(Math.max(min, Math.floor(nextValue)));
+  };
+
+  return (
+    <div className="relative">
+      <Input
+        type="number"
+        min={min}
+        value={normalizedValue}
+        onChange={(event) => {
+          const rawValue = event.target.value;
+          if (rawValue === "") {
+            onChange(fallback);
+            return;
+          }
+
+          commit(Number(rawValue));
+        }}
+        aria-label={ariaLabel}
+        className={cn(
+          PANEL_INPUT_CLASS,
+          "pr-10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+        )}
+      />
+
+      <div className="absolute inset-y-1 right-1 flex w-7 flex-col overflow-hidden rounded-md border border-white/10 bg-[#212121]">
+        <button
+          type="button"
+          aria-label={`Increase ${ariaLabel}`}
+          className="flex h-1/2 items-center justify-center border-b border-white/10 text-neutral-300 transition-colors hover:bg-white/10 hover:text-neutral-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#facc15]/35"
+          onClick={() => commit(normalizedValue + 1)}
+        >
+          <ChevronUp className="h-3.5 w-3.5" />
+        </button>
+
+        <button
+          type="button"
+          aria-label={`Decrease ${ariaLabel}`}
+          className="flex h-1/2 items-center justify-center text-neutral-300 transition-colors hover:bg-white/10 hover:text-neutral-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#facc15]/35"
+          onClick={() => commit(normalizedValue - 1)}
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function InspectorPanel({
   selectedNode,
   className,
@@ -225,7 +318,7 @@ export function InspectorPanel({
           <Input
             value={selectedNode.data.name}
             onChange={(event) => onUpdateName(event.target.value)}
-            className="border-white/15 bg-[#181818] text-neutral-100"
+            className={PANEL_INPUT_CLASS}
           />
           <p className="text-[11px] text-neutral-500">Use a short, action-oriented title so this step is easy to scan in the canvas.</p>
         </div>
@@ -233,12 +326,12 @@ export function InspectorPanel({
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Type</p>
           <Select value={selectedNode.data.type} onValueChange={(value) => onUpdateType(value as WorkflowNode["data"]["type"])}>
-            <SelectTrigger className="border-white/15 bg-[#181818] text-neutral-100">
+            <SelectTrigger className={PANEL_SELECT_TRIGGER_CLASS}>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="border-white/15 bg-[#141414] text-neutral-100">
+            <SelectContent {...PANEL_SELECT_CONTENT_PROPS} className={PANEL_SELECT_CONTENT_CLASS}>
               {ACTION_PRESETS.map((preset) => (
-                <SelectItem key={preset.type} value={preset.type}>
+                <SelectItem key={preset.type} value={preset.type} className={PANEL_SELECT_ITEM_CLASS}>
                   {preset.title}
                 </SelectItem>
               ))}
@@ -261,12 +354,12 @@ export function InspectorPanel({
                   value={asString(selectedNode.data.config.method, "POST")}
                   onValueChange={(value) => onPatchConfig({ method: value })}
                 >
-                  <SelectTrigger className="border-white/15 bg-[#181818] text-neutral-100">
+                  <SelectTrigger className={PANEL_SELECT_TRIGGER_CLASS}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-white/15 bg-[#141414] text-neutral-100">
+                  <SelectContent {...PANEL_SELECT_CONTENT_PROPS} className={PANEL_SELECT_CONTENT_CLASS}>
                     {HTTP_METHODS.map((method) => (
-                      <SelectItem key={method} value={method}>
+                      <SelectItem key={method} value={method} className={PANEL_SELECT_ITEM_CLASS}>
                         {method}
                       </SelectItem>
                     ))}
@@ -279,7 +372,7 @@ export function InspectorPanel({
                 <Input
                   value={asString(selectedNode.data.config.url)}
                   onChange={(event) => onPatchConfig({ url: event.target.value })}
-                  className="border-white/15 bg-[#181818] text-neutral-100"
+                  className={PANEL_INPUT_CLASS}
                 />
                 <p className="text-[11px] text-neutral-500">Include full URL with protocol, for example https://api.example.com/orders.</p>
               </div>
@@ -288,15 +381,11 @@ export function InspectorPanel({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <p className="text-xs text-neutral-500">Timeout (ms)</p>
-                <Input
-                  type="number"
-                  min={1}
+                <NumberInputWithStepper
+                  ariaLabel="Timeout in milliseconds"
                   value={Math.max(1, asNumber(selectedNode.data.config.timeoutMs, 10000))}
-                  onChange={(event) => {
-                    const timeoutMs = Number(event.target.value);
-                    onPatchConfig({ timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000 });
-                  }}
-                  className="border-white/15 bg-[#181818] text-neutral-100"
+                  fallback={10000}
+                  onChange={(timeoutMs) => onPatchConfig({ timeoutMs })}
                 />
               </div>
               <div className="space-y-2">
@@ -304,7 +393,7 @@ export function InspectorPanel({
                 <Input
                   value={toCommaList(selectedNode.data.config.successStatusCodes)}
                   onChange={(event) => onPatchConfig({ successStatusCodes: parseCommaNumberList(event.target.value) })}
-                  className="border-white/15 bg-[#181818] text-neutral-100"
+                  className={PANEL_INPUT_CLASS}
                   placeholder="200, 201, 204"
                 />
               </div>
@@ -315,7 +404,7 @@ export function InspectorPanel({
               <textarea
                 value={recordToLines(selectedNode.data.config.headers)}
                 onChange={(event) => onPatchConfig({ headers: parseLinesToRecord(event.target.value) })}
-                className="h-24 w-full resize-none rounded-lg border border-white/15 bg-[#181818] px-3 py-2 text-sm text-neutral-100 outline-none focus-visible:border-[#facc15]/45 focus-visible:ring-2 focus-visible:ring-[#facc15]/25"
+                className={cn("h-24", PANEL_TEXTAREA_CLASS)}
                 placeholder={"Authorization: Bearer <token>\\nX-Correlation-Id: abc-123"}
               />
             </div>
@@ -325,7 +414,7 @@ export function InspectorPanel({
               <textarea
                 value={recordToLines(selectedNode.data.config.query)}
                 onChange={(event) => onPatchConfig({ query: parseLinesToRecord(event.target.value) })}
-                className="h-24 w-full resize-none rounded-lg border border-white/15 bg-[#181818] px-3 py-2 text-sm text-neutral-100 outline-none focus-visible:border-[#facc15]/45 focus-visible:ring-2 focus-visible:ring-[#facc15]/25"
+                className={cn("h-24", PANEL_TEXTAREA_CLASS)}
                 placeholder={"limit=100\\nactive=true"}
               />
             </div>
@@ -335,7 +424,7 @@ export function InspectorPanel({
               <textarea
                 value={toDisplayText(selectedNode.data.config.body)}
                 onChange={(event) => onPatchConfig({ body: event.target.value })}
-                className="h-40 w-full resize-none rounded-lg border border-white/15 bg-[#181818] px-3 py-2 text-sm text-neutral-100 outline-none focus-visible:border-[#facc15]/45 focus-visible:ring-2 focus-visible:ring-[#facc15]/25"
+                className={cn("h-40", PANEL_TEXTAREA_CLASS)}
                 placeholder='{"key":"value"}'
               />
               <p className="text-[11px] text-neutral-500">Use raw text or JSON. Variables can be added later with templating support.</p>
@@ -353,15 +442,11 @@ export function InspectorPanel({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <p className="text-xs text-neutral-500">Duration</p>
-                <Input
-                  type="number"
-                  min={1}
+                <NumberInputWithStepper
+                  ariaLabel="Delay duration"
                   value={delayParts.value}
-                  onChange={(event) => {
-                    const value = Number(event.target.value);
-                    onPatchConfig({ durationMs: toDurationMs(value, delayParts.unit) });
-                  }}
-                  className="border-white/15 bg-[#181818] text-neutral-100"
+                  fallback={1}
+                  onChange={(value) => onPatchConfig({ durationMs: toDurationMs(value, delayParts.unit) })}
                 />
               </div>
               <div className="space-y-2">
@@ -373,12 +458,12 @@ export function InspectorPanel({
                     onPatchConfig({ durationMs: toDurationMs(delayParts.value, unit) });
                   }}
                 >
-                  <SelectTrigger className="border-white/15 bg-[#181818] text-neutral-100">
+                  <SelectTrigger className={PANEL_SELECT_TRIGGER_CLASS}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-white/15 bg-[#141414] text-neutral-100">
+                  <SelectContent {...PANEL_SELECT_CONTENT_PROPS} className={PANEL_SELECT_CONTENT_CLASS}>
                     {DELAY_UNITS.map((unit) => (
-                      <SelectItem key={unit} value={unit}>
+                      <SelectItem key={unit} value={unit} className={PANEL_SELECT_ITEM_CLASS}>
                         {unit.charAt(0).toUpperCase() + unit.slice(1)}
                       </SelectItem>
                     ))}
@@ -403,12 +488,12 @@ export function InspectorPanel({
                   value={asString(selectedNode.data.config.provider, "sendgrid")}
                   onValueChange={(value) => onPatchConfig({ provider: value })}
                 >
-                  <SelectTrigger className="border-white/15 bg-[#181818] text-neutral-100">
+                  <SelectTrigger className={PANEL_SELECT_TRIGGER_CLASS}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-white/15 bg-[#141414] text-neutral-100">
-                    <SelectItem value="sendgrid">SendGrid</SelectItem>
-                    <SelectItem value="smtp">SMTP</SelectItem>
+                  <SelectContent {...PANEL_SELECT_CONTENT_PROPS} className={PANEL_SELECT_CONTENT_CLASS}>
+                    <SelectItem value="sendgrid" className={PANEL_SELECT_ITEM_CLASS}>SendGrid</SelectItem>
+                    <SelectItem value="smtp" className={PANEL_SELECT_ITEM_CLASS}>SMTP</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -418,7 +503,7 @@ export function InspectorPanel({
                 <Input
                   value={asString(selectedNode.data.config.from)}
                   onChange={(event) => onPatchConfig({ from: event.target.value })}
-                  className="border-white/15 bg-[#181818] text-neutral-100"
+                  className={PANEL_INPUT_CLASS}
                   placeholder="noreply@example.com"
                 />
               </div>
@@ -429,7 +514,7 @@ export function InspectorPanel({
               <Input
                 value={toCommaList(selectedNode.data.config.to)}
                 onChange={(event) => onPatchConfig({ to: parseCommaList(event.target.value) })}
-                className="border-white/15 bg-[#181818] text-neutral-100"
+                className={PANEL_INPUT_CLASS}
                 placeholder="ops@example.com, engineering@example.com"
               />
               <p className="text-[11px] text-neutral-500">At least one recipient is required.</p>
@@ -441,7 +526,7 @@ export function InspectorPanel({
                 <Input
                   value={toCommaList(selectedNode.data.config.cc)}
                   onChange={(event) => onPatchConfig({ cc: parseCommaList(event.target.value) })}
-                  className="border-white/15 bg-[#181818] text-neutral-100"
+                  className={PANEL_INPUT_CLASS}
                   placeholder="team@example.com"
                 />
               </div>
@@ -450,7 +535,7 @@ export function InspectorPanel({
                 <Input
                   value={toCommaList(selectedNode.data.config.bcc)}
                   onChange={(event) => onPatchConfig({ bcc: parseCommaList(event.target.value) })}
-                  className="border-white/15 bg-[#181818] text-neutral-100"
+                  className={PANEL_INPUT_CLASS}
                   placeholder="audit@example.com"
                 />
               </div>
@@ -461,7 +546,7 @@ export function InspectorPanel({
               <Input
                 value={asString(selectedNode.data.config.replyTo)}
                 onChange={(event) => onPatchConfig({ replyTo: event.target.value })}
-                className="border-white/15 bg-[#181818] text-neutral-100"
+                className={PANEL_INPUT_CLASS}
                 placeholder="support@example.com"
               />
             </div>
@@ -471,7 +556,7 @@ export function InspectorPanel({
               <Input
                 value={asString(selectedNode.data.config.subject)}
                 onChange={(event) => onPatchConfig({ subject: event.target.value })}
-                className="border-white/15 bg-[#181818] text-neutral-100"
+                className={PANEL_INPUT_CLASS}
               />
             </div>
             <div className="space-y-2">
@@ -479,7 +564,7 @@ export function InspectorPanel({
               <textarea
                 value={asString(selectedNode.data.config.text)}
                 onChange={(event) => onPatchConfig({ text: event.target.value })}
-                className="h-32 w-full resize-none rounded-lg border border-white/15 bg-[#181818] px-3 py-2 text-sm text-neutral-100 outline-none focus-visible:border-[#facc15]/45 focus-visible:ring-2 focus-visible:ring-[#facc15]/25"
+                className={cn("h-32", PANEL_TEXTAREA_CLASS)}
               />
             </div>
 
@@ -488,7 +573,7 @@ export function InspectorPanel({
               <textarea
                 value={asString(selectedNode.data.config.html)}
                 onChange={(event) => onPatchConfig({ html: event.target.value })}
-                className="h-32 w-full resize-none rounded-lg border border-white/15 bg-[#181818] px-3 py-2 text-sm text-neutral-100 outline-none focus-visible:border-[#facc15]/45 focus-visible:ring-2 focus-visible:ring-[#facc15]/25"
+                className={cn("h-32", PANEL_TEXTAREA_CLASS)}
                 placeholder="<p>Hello {{user.name}}</p>"
               />
             </div>
@@ -514,7 +599,7 @@ export function InspectorPanel({
                 <Input
                   value={asString(selectedNode.data.config.url)}
                   onChange={(event) => onPatchConfig({ url: event.target.value })}
-                  className="border-white/15 bg-[#181818] text-neutral-100"
+                  className={PANEL_INPUT_CLASS}
                 />
               </div>
               <div className="space-y-2">
@@ -523,12 +608,12 @@ export function InspectorPanel({
                   value={asString(selectedNode.data.config.method, "POST")}
                   onValueChange={(value) => onPatchConfig({ method: value })}
                 >
-                  <SelectTrigger className="border-white/15 bg-[#181818] text-neutral-100">
+                  <SelectTrigger className={PANEL_SELECT_TRIGGER_CLASS}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-white/15 bg-[#141414] text-neutral-100">
+                  <SelectContent {...PANEL_SELECT_CONTENT_PROPS} className={PANEL_SELECT_CONTENT_CLASS}>
                     {HTTP_METHODS.map((method) => (
-                      <SelectItem key={method} value={method}>
+                      <SelectItem key={method} value={method} className={PANEL_SELECT_ITEM_CLASS}>
                         {method}
                       </SelectItem>
                     ))}
@@ -540,15 +625,11 @@ export function InspectorPanel({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <p className="text-xs text-neutral-500">Timeout (ms)</p>
-                <Input
-                  type="number"
-                  min={1}
+                <NumberInputWithStepper
+                  ariaLabel="Webhook timeout in milliseconds"
                   value={Math.max(1, asNumber(selectedNode.data.config.timeoutMs, 10000))}
-                  onChange={(event) => {
-                    const timeoutMs = Number(event.target.value);
-                    onPatchConfig({ timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000 });
-                  }}
-                  className="border-white/15 bg-[#181818] text-neutral-100"
+                  fallback={10000}
+                  onChange={(timeoutMs) => onPatchConfig({ timeoutMs })}
                 />
               </div>
               <div className="space-y-2">
@@ -556,7 +637,7 @@ export function InspectorPanel({
                 <Input
                   value={toCommaList(selectedNode.data.config.successStatusCodes)}
                   onChange={(event) => onPatchConfig({ successStatusCodes: parseCommaNumberList(event.target.value) })}
-                  className="border-white/15 bg-[#181818] text-neutral-100"
+                  className={PANEL_INPUT_CLASS}
                   placeholder="200, 201, 204"
                 />
               </div>
@@ -567,7 +648,7 @@ export function InspectorPanel({
               <textarea
                 value={recordToLines(selectedNode.data.config.headers)}
                 onChange={(event) => onPatchConfig({ headers: parseLinesToRecord(event.target.value) })}
-                className="h-24 w-full resize-none rounded-lg border border-white/15 bg-[#181818] px-3 py-2 text-sm text-neutral-100 outline-none focus-visible:border-[#facc15]/45 focus-visible:ring-2 focus-visible:ring-[#facc15]/25"
+                className={cn("h-24", PANEL_TEXTAREA_CLASS)}
               />
             </div>
 
@@ -576,7 +657,7 @@ export function InspectorPanel({
               <textarea
                 value={recordToLines(selectedNode.data.config.payload)}
                 onChange={(event) => onPatchConfig({ payload: parseLinesToRecord(event.target.value) })}
-                className="h-24 w-full resize-none rounded-lg border border-white/15 bg-[#181818] px-3 py-2 text-sm text-neutral-100 outline-none focus-visible:border-[#facc15]/45 focus-visible:ring-2 focus-visible:ring-[#facc15]/25"
+                className={cn("h-24", PANEL_TEXTAREA_CLASS)}
               />
             </div>
           </div>
@@ -596,28 +677,24 @@ export function InspectorPanel({
               onUpdateFailure({ strategy: next });
             }}
           >
-            <SelectTrigger className="border-white/15 bg-[#181818] text-neutral-100">
+            <SelectTrigger className={PANEL_SELECT_TRIGGER_CLASS}>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="border-white/15 bg-[#141414] text-neutral-100">
-              <SelectItem value="retry">Auto Retry</SelectItem>
-              <SelectItem value="stop">Stop Workflow</SelectItem>
-              <SelectItem value="continue">Continue Workflow</SelectItem>
+            <SelectContent {...PANEL_SELECT_CONTENT_PROPS} className={PANEL_SELECT_CONTENT_CLASS}>
+              <SelectItem value="retry" className={PANEL_SELECT_ITEM_CLASS}>Auto Retry</SelectItem>
+              <SelectItem value="stop" className={PANEL_SELECT_ITEM_CLASS}>Stop Workflow</SelectItem>
+              <SelectItem value="continue" className={PANEL_SELECT_ITEM_CLASS}>Continue Workflow</SelectItem>
             </SelectContent>
           </Select>
 
           {strategy === "retry" && (
             <div className="space-y-2 pt-2">
               <p className="text-xs text-neutral-500">Max Attempts</p>
-              <Input
-                type="number"
-                min={1}
+              <NumberInputWithStepper
+                ariaLabel="Retry max attempts"
                 value={maxAttempts}
-                onChange={(event) => {
-                  const next = Math.max(1, Number(event.target.value) || 1);
-                  onUpdateFailure({ strategy: "retry", maxAttempts: next });
-                }}
-                className="border-white/15 bg-[#181818] text-neutral-100"
+                fallback={1}
+                onChange={(next) => onUpdateFailure({ strategy: "retry", maxAttempts: next })}
               />
             </div>
           )}
@@ -630,12 +707,12 @@ export function InspectorPanel({
             value={selectedNode.data.isActive ? "active" : "paused"}
             onValueChange={(value) => onToggleActive(value === "active")}
           >
-            <SelectTrigger className="border-white/15 bg-[#181818] text-neutral-100">
+            <SelectTrigger className={PANEL_SELECT_TRIGGER_CLASS}>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="border-white/15 bg-[#141414] text-neutral-100">
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="paused">Paused</SelectItem>
+            <SelectContent {...PANEL_SELECT_CONTENT_PROPS} className={PANEL_SELECT_CONTENT_CLASS}>
+              <SelectItem value="active" className={PANEL_SELECT_ITEM_CLASS}>Active</SelectItem>
+              <SelectItem value="paused" className={PANEL_SELECT_ITEM_CLASS}>Paused</SelectItem>
             </SelectContent>
           </Select>
         </div>

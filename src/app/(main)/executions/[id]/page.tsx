@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAppDispatch, useAppSelector } from "@/hooks/useAppStore";
+import { useExecutionRealtime } from "@/hooks/useExecutionRealtime";
 import { fetchExecutionSteps, replayExecution } from "@/state/slices/dispatch.slice";
 
 export default function ExecutionTracePage() {
@@ -19,6 +20,8 @@ export default function ExecutionTracePage() {
   const execution = useAppSelector((s) => s.dispatch.current);
   const steps = useAppSelector((s) => s.dispatch.steps);
   const status = useAppSelector((s) => s.dispatch.status);
+
+  useExecutionRealtime(executionId);
 
   useEffect(() => {
     dispatch(fetchExecutionSteps({ executionId }));

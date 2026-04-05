@@ -1,448 +1,343 @@
-# Workflow Editor MVP Roadmap (UI-Only Focus)
+# Workflow Backend Implementation Plan (Scalable)
 
-This roadmap is intentionally scoped to UI work only. Backend, API contract changes, persistence logic, and data model changes are deferred.
+## 1) Goal
 
-## 1) UI-Only Goal
+Implement a production-ready backend for:
 
-Deliver a polished, usable workflow editor interface where users can visually compose workflows, configure step forms, and understand status and validation feedback through UI states.
+1. Editor state persistence (nodes + node positions in database).
+2. Live collaborative updates over sockets.
+3. Reliable workflow action dispatch to executor.
 
-## 2) UI Scope
+The design must support horizontal scaling, retries, idempotency, and low-latency UX.
 
-### In Scope (UI)
+---
 
-1. Dark themed workflow editor shell and visual consistency.
-2. Canvas and node visuals for a linear workflow editor.
-3. Node create, select, drag, delete interaction UX.
-4. Inspector panel UI for all supported action types.
-5. Toolbar controls UI behavior (save/publish/test run/undo state feedback).
-6. Empty, loading, and error presentation states.
-7. Responsive and accessibility-focused interaction polish.
+## 2) Current Baseline (What Already Exists)
 
-### Out of Scope (Non-UI for now)
+- Backend already stores workflow actions in Postgres (`WorkflowAction`) and dispatches executions over gRPC to executor.
+- Executor already reports execution and step updates back to backend over gRPC.
+- Dispatch callbacks are accepted, but backend step status persistence is still minimal.
+- Frontend editor currently builds nodes in memory and does not persist node layout coordinates.
 
-1. Backend API changes.
-2. State architecture refactors unrelated to presentation or interaction.
-3. Business-rule validation logic changes.
-4. Execution engine and dispatcher behavior.
-5. Data persistence strategy changes.
+Implication: We should extend existing modules, not rewrite.
 
-## 3) UI MVP Definition of Done
+---
 
-UI MVP is complete when all items below are true:
+## 3) Target Architecture
 
-1. The editor interface is visually complete for desktop and tablet breakpoints.
-2. Core editor interactions are intuitive and stable:
-   - add step
-   - select step
-   - configure step in inspector
-   - reorder step
-   - delete step
-3. All action-type configuration forms are complete from a UI perspective.
-4. Header actions provide clear visual feedback for all states.
-5. Empty/loading/error UI states are consistent and informative.
-6. Keyboard and focus behavior are acceptable for primary user flows.
+### 3.1 Source of Truth
 
-## 4) UI Delivery Roadmap (4 Iterations)
+- Postgres remains source of truth for workflow definitions and editor layout metadata.
+- Executor remains source of truth for execution runtime internals, but backend keeps a mirrored execution timeline for API + socket fan-out.
 
-## Iteration 1: Shell and Visual Foundation
+### 3.2 Realtime Layer
 
-1. Finalize dark editor shell, spacing, and hierarchy.
-2. Align top toolbar, canvas, and inspector visual rhythm.
-3. Standardize typography, icon sizing, and border/shadow language.
+- Add Socket.IO in backend attached to the same HTTP server.
+- Use Redis adapter for multi-instance pub/sub fan-out.
+- Clients join workflow rooms and execution rooms.
 
-Exit Criteria:
+### 3.3 Reliable Dispatch
 
-1. Editor shell has final dark theme token usage.
-2. Toolbar, canvas, and inspector feel like one coherent product surface.
+- Add dispatch outbox table + worker to decouple API latency from gRPC delivery.
+- Use at-least-once delivery with idempotency keys and retry policy.
+- Executor enqueue must be idempotent by `executionId`.
 
-## Iteration 2: Canvas and Node Interaction UX
+---
 
-1. Polish node cards and connector visuals.
-2. Improve drag affordance, selection clarity, and insertion controls.
-3. Add clear blocked-state UI when max steps are reached.
+## 4) Workstream A: Editor State in DB (Nodes + Positions)
 
-Exit Criteria:
+### 4.1 Data Model Changes (Prisma)
 
-1. User can visually understand and manipulate step sequence confidently.
-2. Interaction feedback is clear during drag and insert actions.
+Add layout fields to `WorkflowAction` (minimal-change path):
 
-## Iteration 3: Inspector and Form UX Completeness
+- `nodeId String?`
+- `positionX Int?`
+- `positionY Int?`
+- `editorMeta Json?` (optional for width, height, future node flags)
 
-1. Complete inspector layouts for all action types.
-2. Improve form grouping, labels, helper text, and input affordances.
-3. Add UI-level field hinting and invalid-state presentation.
+Add workflow-level editor revision tracking:
 
-Exit Criteria:
+- New table `WorkflowEditorState`
+	- `workflowId String @unique`
+	- `revision Int @default(1)`
+	- `viewport Json?`
+	- `lastEditedBy String?`
+	- `updatedAt DateTime @updatedAt`
 
-1. Users can configure all actions without confusion.
-2. Form-level UI communicates what is required before save/test.
+Reason:
 
-## Iteration 4: State Feedback, Accessibility, and QA
+- Per-node coordinates stay queryable with actions.
+- Revision enables optimistic concurrency for live edits.
+- Viewport is workflow-level, not action-level.
 
-1. Finalize save/publish/validate/undo visual states.
-2. Improve keyboard traversal and focus indicators.
-3. Complete UI QA checklist and visual regression pass.
+### 4.2 API Contract Changes
 
-Exit Criteria:
+Extend existing action upsert payload:
 
-1. Primary keyboard-only workflow is usable.
-2. UI QA checklist is green.
+- Accept `nodeId`, `position`, `editorMeta`.
 
-## 5) Per-Feature UI Plans
+Add editor-state endpoints:
 
-## Feature UI-1: Editor Shell Layout and Theming
+- `GET /workflows/:workflowId/editor-state`
+	- returns `revision`, `viewport`, `nodes` (action + layout)
+- `PATCH /workflows/:workflowId/editor-state`
+	- accepts `baseRevision`, patch payload
+	- server increments revision atomically
 
-Priority: P0
+### 4.3 Backend Code Changes
 
-Goal:
+Update modules:
 
-1. Establish a stable dark workspace layout that feels production-ready.
+- `backend/src/modules/actions/actions.controller.ts`
+- `backend/src/modules/actions/actions.service.ts`
+- `backend/src/modules/actions/actions.repository.ts`
 
-Files:
+Create new module:
 
-1. src/app/(main)/layout.tsx
-2. src/app/(main)/workflows/[id]/components/workflow-editor.tsx
-3. src/app/(main)/workflows/[id]/components/editor-header.tsx
+- `backend/src/modules/editor-state/editor-state.router.ts`
+- `backend/src/modules/editor-state/editor-state.controller.ts`
+- `backend/src/modules/editor-state/editor-state.service.ts`
+- `backend/src/modules/editor-state/editor-state.repository.ts`
 
-UI Plan:
+### 4.4 Migration and Backfill
 
-1. Define final shell spacing tokens for header and content zones.
-2. Ensure dark palette contrast is readable for long sessions.
-3. Remove visual clutter and keep a clear editor focal area.
+- Backfill existing actions with deterministic defaults:
+	- `nodeId = action.id`
+	- `positionX = 560`
+	- `positionY = 260 + ((stepNumber - 1) * 190)`
+- Create `WorkflowEditorState` row for every existing workflow.
 
-Done Criteria:
+---
 
-1. Header and canvas boundaries are visually clean.
-2. No accidental overlap, clipping, or inconsistent spacing.
+## 5) Workstream B: Live Updates with Socket
 
-UI QA:
+### 5.1 Socket Stack
 
-1. Verify on 1280, 1440, and 1920 widths.
-2. Verify no top-gap or shell offset issues.
+- Add dependencies:
+	- `socket.io`
+	- `@socket.io/redis-adapter`
+	- `redis`
+- Mount socket server in `backend/src/server.ts` after HTTP server creation.
 
-## Feature UI-2: Canvas Visual Language
+### 5.2 Auth and Room Strategy
 
-Priority: P0
+- Authenticate handshake with existing JWT.
+- Room naming:
+	- `workflow:{workflowId}` for editor collaboration
+	- `execution:{executionId}` for run monitoring
 
-Goal:
+### 5.3 Event Protocol (v1)
 
-1. Make the canvas feel interactive and informative even before editing starts.
+Editor events:
 
-Files:
+- `editor:join` -> payload `{ workflowId }`
+- `editor:state` -> initial snapshot `{ revision, nodes, viewport }`
+- `editor:patch` -> client patch `{ workflowId, baseRevision, changes }`
+- `editor:patched` -> ack with new revision
+- `editor:conflict` -> server sends canonical state if revision mismatch
+- `editor:presence` -> optional cursor/selection presence metadata
 
-1. src/app/(main)/workflows/[id]/components/workflow-canvas.tsx
+Execution events:
 
-UI Plan:
+- `execution:status`
+- `execution:step`
 
-1. Finalize grid/dot background density and contrast.
-2. Improve empty-state card placement and messaging hierarchy.
-3. Harmonize connector color/weight with selected node states.
-4. Refine add-between action button visual prominence.
+### 5.4 Concurrency Control
 
-Done Criteria:
+- Every patch must include `baseRevision`.
+- Server applies patch in DB transaction only if `baseRevision` matches current.
+- On mismatch: reject and return fresh snapshot.
 
-1. Canvas is readable at default zoom and during panning.
-2. Empty and populated states feel consistent.
+### 5.5 Performance Safeguards
 
-UI QA:
+- Debounce drag patch emission on client (for example every 80-150ms).
+- Server-side patch validation + payload size limits.
+- Optional coalescing worker for high-frequency position updates.
 
-1. Verify visual clarity at zoom levels 0.75x, 1x, and 1.25x.
-2. Verify connector contrast on dark background.
+---
 
-## Feature UI-3: Node Card Interaction UX
+## 6) Workstream C: Dispatcher to Executor (Reliable + Scalable)
 
-Priority: P0
+### 6.1 Gaps to Close
 
-Goal:
+- Current enqueue path is synchronous from API/event handler to gRPC call.
+- Step status callback currently does not persist detailed step logs in backend Postgres.
 
-1. Ensure each node card clearly communicates type, order, and interaction affordance.
+### 6.2 Add Dispatch Outbox
 
-Files:
+New table: `DispatchOutbox`
 
-1. src/app/(main)/workflows/[id]/components/workflow-node-card.tsx
-2. src/app/(main)/workflows/[id]/components/action-icon.tsx
+- `id`
+- `executionId` (unique)
+- `payloadJson`
+- `status` (`pending`, `processing`, `delivered`, `failed`)
+- `attemptCount`
+- `nextAttemptAt`
+- `lastError`
+- timestamps
 
-UI Plan:
+Flow:
 
-1. Finalize selected, hover, and drag states.
-2. Improve drag handle discoverability.
-3. Make step number, title, and type badge hierarchy obvious.
+1. API/event path creates execution + outbox row in one transaction.
+2. Worker polls outbox and performs gRPC enqueue.
+3. On success -> `delivered`.
+4. On failure -> retry with exponential backoff; send to dead-letter when max attempts exceeded.
 
-Done Criteria:
+### 6.3 Mirror Execution Steps in Backend DB
 
-1. Users can identify selected node instantly.
-2. Drag handle and click target behavior are visually obvious.
+New table: `ExecutionStep` in Postgres (backend side mirror)
 
-UI QA:
+- `executionId`, `stepIndex` composite unique
+- `status`, `attemptCount`, `stepType`
+- `requestJson`, `responseJson`, `errorMessage`
+- `startedAt`, `finishedAt`, `updatedAt`
 
-1. Verify hover/selected/drag state transitions are smooth.
-2. Verify no text clipping at long action names.
+When backend receives gRPC callbacks:
 
-## Feature UI-4: Toolbar Controls and Feedback
+- Upsert execution status in `Execution`.
+- Upsert step row in `ExecutionStep`.
+- Emit socket events to `execution:{executionId}` room.
 
-Priority: P0
+### 6.4 API Changes
 
-Goal:
+- `GET /dispatch/executions/:executionId/steps` should read from backend Postgres mirror first.
+- Keep gRPC pull from executor only as fallback path behind feature flag during migration.
 
-1. Provide clear control affordance for add, undo, test run, save, and publish actions.
+---
 
-Files:
+## 7) Scalability Design Rules
 
-1. src/app/(main)/workflows/[id]/components/editor-header.tsx
+1. Stateless API nodes
+- No in-memory workflow state ownership.
+- All state persisted in Postgres and propagated via Redis-backed socket adapter.
 
-UI Plan:
+2. Idempotency everywhere
+- Event ingestion already has idempotency key.
+- Outbox uses unique `executionId`.
+- Executor enqueue is idempotent by `executionId`.
 
-1. Standardize control density and spacing across all action buttons.
-2. Ensure disabled/loading states are visually distinct.
-3. Improve status pill and unsaved-changes indicator readability.
-4. Keep add-step menu easy to scan with stronger grouping.
+3. Backpressure and retries
+- Bounded worker concurrency.
+- Exponential backoff with max retry count.
+- Dead-letter for manual replay.
 
-Done Criteria:
+4. Optimistic concurrency for editor
+- Revision checks prevent last-write-wins corruption.
 
-1. Users can infer control status without guessing.
-2. Toolbar remains usable on narrower desktop widths.
+5. Observability
+- Add metrics and structured logs for:
+	- socket joins/disconnects
+	- patch apply latency
+	- outbox lag and retry counts
+	- gRPC enqueue latency and failure rate
+	- callback processing latency
 
-UI QA:
+---
 
-1. Verify all button states: idle, hover, disabled, loading.
-2. Verify dropdown remains legible and keyboard-focusable.
+## 8) Delivery Phases
 
-## Feature UI-5: Inspector Panel Structure
+### Phase 1: Schema + Persistence Foundations
 
-Priority: P0
+- Prisma migrations for layout fields, editor state, outbox, execution steps.
+- Repository + service updates for actions and execution step mirror.
+- Backfill script for existing workflows.
 
-Goal:
+Exit criteria:
 
-1. Make the inspector easy to scan and edit quickly for each action type.
+- Node coordinates persisted and returned by APIs.
+- No regression in existing workflow/action endpoints.
 
-Files:
+### Phase 2: Realtime Editor (Single Instance)
 
-1. src/app/(main)/workflows/[id]/components/inspector-panel.tsx
+- Socket server with JWT auth.
+- Workflow room join + snapshot + patch ack/conflict.
+- Revision-based transactional patch application.
 
-UI Plan:
+Exit criteria:
 
-1. Group fields by intent: transport, content, retry/failure, execution status.
-2. Improve section headings, helper text, and vertical spacing.
-3. Apply consistent input styling for input/select/textarea controls.
-4. Add subtle warning style for incomplete required fields.
+- Two tabs can edit same workflow with consistent state.
 
-Done Criteria:
+### Phase 3: Realtime + Horizontal Scale
 
-1. Form sections are understandable without external docs.
-2. Visual noise is reduced while preserving required detail.
+- Redis adapter integration.
+- Multi-instance socket fan-out validation.
+- Presence events (optional, lightweight).
 
-UI QA:
+Exit criteria:
 
-1. Verify one pass per action type section.
-2. Verify long JSON-ish text remains readable in textareas.
+- Cross-instance realtime updates are consistent.
 
-## Feature UI-6: Action-Type Form Completeness (UI)
+### Phase 4: Reliable Dispatch Outbox
 
-Priority: P0
+- Outbox worker + retry + dead-letter.
+- API/event path writes to outbox transactionally.
 
-Goal:
+Exit criteria:
 
-1. Ensure each action type has complete and ergonomic UI controls.
+- Temporary executor outage no longer causes execution loss.
 
-Files:
+### Phase 5: Execution Live Stream + API Stabilization
 
-1. src/app/(main)/workflows/[id]/components/inspector-panel.tsx
+- Persist step callbacks in backend Postgres mirror.
+- Emit execution socket events.
+- Switch execution steps endpoint to backend mirror.
 
-UI Plan:
+Exit criteria:
 
-1. HTTP Request UI:
-   - method, url, timeout, success codes, headers, query, body
-2. Send Email UI:
-   - provider, from, to, cc, bcc, replyTo, subject, text/html
-3. Webhook Notification UI:
-   - url, method, timeout, success codes, headers, payload
-4. Delay UI:
-   - duration value and unit controls
-5. Failure policy UI:
-   - strategy select and max attempts field
+- Dashboard/execution detail can run without direct executor gRPC reads.
 
-Done Criteria:
+---
 
-1. No required action field is missing from UI.
-2. UI labels and placeholders are clear and task-oriented.
+## 9) Testing Plan
 
-UI QA:
+### Unit Tests
 
-1. Run through all form sections without backend dependencies.
-2. Verify helper text explains expected formats.
+- Patch merge and revision conflict logic.
+- Outbox retry scheduling and terminal failure behavior.
+- Step status upsert idempotency.
 
-## Feature UI-7: Empty, Loading, and Error States
+### Integration Tests
 
-Priority: P1
+- End-to-end: create workflow -> edit positions -> save -> reload -> positions retained.
+- End-to-end: enqueue execution -> executor callback -> backend status + socket event.
+- Multi-client socket conflict scenario.
 
-Goal:
+### Load Tests
 
-1. Make non-happy paths understandable and visually consistent.
+- 1k concurrent socket clients across workflow rooms.
+- High-frequency drag patches with throttling.
+- Outbox throughput benchmark under executor latency.
 
-Files:
+---
 
-1. src/app/(main)/workflows/[id]/components/workflow-editor.tsx
-2. src/app/(main)/workflows/[id]/components/workflow-canvas.tsx
-3. src/app/(main)/workflows/[id]/components/inspector-panel.tsx
+## 10) Operational Runbook Additions
 
-UI Plan:
+- Feature flags:
+	- `EDITOR_SOCKET_ENABLED`
+	- `DISPATCH_OUTBOX_ENABLED`
+	- `EXECUTION_STEP_MIRROR_ENABLED`
+- Replay tools for dead letters.
+- Dashboard panel for outbox lag + callback failure rate.
 
-1. Improve empty-state call-to-action hierarchy.
-2. Standardize spinner and inline feedback styles.
-3. Ensure errors are visible but non-disruptive.
+---
 
-Done Criteria:
+## 11) Suggested Implementation Order (Team Parallelism)
 
-1. Users always see what to do next in empty/error states.
-2. Loading feedback does not block unrelated interactions.
+Track A (Data/API): Schema, repositories, action payload updates.
 
-UI QA:
+Track B (Realtime): Socket infra, auth middleware, patch protocol, Redis adapter.
 
-1. Simulate initial empty workflow.
-2. Simulate save/validate failure message display.
+Track C (Dispatch): Outbox worker, callback mirroring, execution event emission.
 
-## Feature UI-8: Responsive Behavior
+Integration point after Track A baseline migration.
 
-Priority: P1
+---
 
-Goal:
+## 12) Definition of Done
 
-1. Keep editor usable on smaller desktop and tablet widths.
+1. Node positions and editor state persist in DB and survive reload/publish.
+2. Realtime updates work for multi-client collaboration and execution monitoring.
+3. Dispatch path is resilient (retry + dead-letter) and observable.
+4. APIs are backward compatible or versioned with migration notes.
+5. Automated tests cover conflict handling, retries, and callback idempotency.
 
-Files:
-
-1. src/app/(main)/workflows/[id]/components/workflow-editor.tsx
-2. src/app/(main)/workflows/[id]/components/editor-header.tsx
-3. src/app/(main)/workflows/[id]/components/inspector-panel.tsx
-
-UI Plan:
-
-1. Define breakpoints for inspector collapse/stack behavior.
-2. Prevent toolbar overflow with priority-based control wrapping.
-3. Preserve node readability in constrained width.
-
-Done Criteria:
-
-1. Core edit flow remains possible at 1024px width.
-2. No major clipping/overflow defects.
-
-UI QA:
-
-1. Test at 1024px, 1280px, 1440px.
-2. Test browser zoom 90 percent and 110 percent.
-
-## Feature UI-9: Accessibility and Keyboard UX
-
-Priority: P1
-
-Goal:
-
-1. Improve baseline accessibility for editor interactions.
-
-Files:
-
-1. src/app/(main)/workflows/[id]/components/editor-header.tsx
-2. src/app/(main)/workflows/[id]/components/workflow-node-card.tsx
-3. src/app/(main)/workflows/[id]/components/inspector-panel.tsx
-4. src/app/(main)/workflows/[id]/components/workflow-canvas.tsx
-
-UI Plan:
-
-1. Ensure visible focus style on all interactive elements.
-2. Add/improve ARIA labels for icon-only controls.
-3. Verify logical tab order through toolbar, canvas controls, and inspector.
-
-Done Criteria:
-
-1. Keyboard-only user can complete a basic edit cycle.
-2. Focus is never lost during common interactions.
-
-UI QA:
-
-1. Keyboard traversal pass from page load to save action.
-2. Spot check with browser accessibility inspector.
-
-## Feature UI-10: UI QA and Visual Regression Pass
-
-Priority: P2
-
-Goal:
-
-1. Reduce UI regressions and improve confidence before release.
-
-Files:
-
-1. src/app/(main)/workflows/[id]/*
-
-UI Plan:
-
-1. Define screenshot checklist for key states:
-   - empty canvas
-   - populated canvas
-   - selected node
-   - inspector per action type
-   - validation success/error banner
-2. Add simple manual visual regression checklist in PR template notes.
-
-Done Criteria:
-
-1. No unresolved visual defects with severity high.
-2. UI sign-off complete for all core screens.
-
-UI QA:
-
-1. Screenshot comparison against baseline states.
-2. Final pass on dark mode readability and spacing.
-
-## 6) Prioritized UI Backlog
-
-## P0 (Must Ship)
-
-1. Feature UI-1
-2. Feature UI-2
-3. Feature UI-3
-4. Feature UI-4
-5. Feature UI-5
-6. Feature UI-6
-
-## P1 (Should Ship in MVP Window)
-
-1. Feature UI-7
-2. Feature UI-8
-3. Feature UI-9
-
-## P2 (Polish)
-
-1. Feature UI-10
-
-## 7) UI Risks and Mitigation
-
-1. Risk: Dense inspector forms overwhelm users.
-   Mitigation: stronger sectioning, helper text, and progressive grouping.
-2. Risk: Toolbar clutter at smaller widths.
-   Mitigation: control wrapping and responsive priority handling.
-3. Risk: Inconsistent interactive feedback across components.
-   Mitigation: standardize hover/active/focus token usage.
-4. Risk: Dark theme contrast issues.
-   Mitigation: explicit contrast QA for text and borders in all panels.
-
-## 8) UI QA Checklist for Sign-off
-
-1. Open editor and confirm shell/layout consistency.
-2. Add nodes from toolbar and edge controls.
-3. Select and drag nodes and verify interaction feedback.
-4. Open inspector and configure each action type section.
-5. Verify toolbar button states and labels.
-6. Verify empty, loading, and error UI states.
-7. Verify responsive behavior at key breakpoints.
-8. Verify keyboard focus visibility and tab order.
-9. Verify dark theme readability and spacing rhythm.
-10. Verify no major clipping, overlap, or overflow issues.
-
-## 9) Immediate UI Next Actions
-
-1. Implement max-steps blocked-state message in canvas and add-step menu.
-2. Improve inspector section spacing and helper text for required fields.
-3. Add unsaved-change visual indicator persistence in header.
-4. Add responsive toolbar overflow handling for narrow widths.
-5. Run full UI QA checklist and fix P0 visual defects.

@@ -50,6 +50,9 @@ export function upsertWorkflowAction(
     config: Record<string, unknown>;
     onFailure?: Record<string, unknown>;
     isActive?: boolean;
+    nodeId?: string;
+    position?: { x: number; y: number };
+    editorMeta?: Record<string, unknown>;
   },
 ) {
   return requestJson<WorkflowAction>(`/actions/workflows/${workflowId}/steps/${stepNumber}`, {

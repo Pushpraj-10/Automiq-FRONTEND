@@ -128,6 +128,26 @@ function getDurationMs(config: Record<string, unknown>) {
   return 60000;
 }
 
+function toFiniteNumber(value: unknown): number | undefined {
+  const next = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(next)) return undefined;
+  return next;
+}
+
+function resolveNodePosition(action: WorkflowAction, index: number): Point {
+  const savedX = toFiniteNumber(action.positionX);
+  const savedY = toFiniteNumber(action.positionY);
+
+  if (savedX !== undefined && savedY !== undefined) {
+    return { x: savedX, y: savedY };
+  }
+
+  return {
+    x: CANVAS_CENTER_X,
+    y: CANVAS_START_Y + index * NODE_SPACING_Y,
+  };
+}
+
 export function normalizeOnFailure(onFailure?: Record<string, unknown>) {
   if (!isRecord(onFailure)) return undefined;
 
@@ -197,11 +217,8 @@ export function buildNodesFromActions(workflowId: string, actions: WorkflowActio
   const sorted = [...actions].sort((a, b) => a.stepNumber - b.stepNumber);
 
   return sorted.map((action, index) => ({
-    id: action.id || createNodeId(),
-    position: {
-      x: CANVAS_CENTER_X,
-      y: CANVAS_START_Y + index * NODE_SPACING_Y,
-    },
+    id: action.nodeId || action.id || createNodeId(),
+    position: resolveNodePosition(action, index),
     width: NODE_WIDTH,
     height: NODE_HEIGHT,
     data: {
@@ -281,6 +298,15 @@ export function toSavePayload(nodes: WorkflowNode[]): SaveActionInput[] {
 
   return sorted.map((node) => ({
     id: node.data.actionId,
+    nodeId: node.id,
+    position: {
+      x: Math.round(node.position.x),
+      y: Math.round(node.position.y),
+    },
+    editorMeta: {
+      width: node.width,
+      height: node.height,
+    },
     stepNumber: node.data.stepNumber,
     type: node.data.type,
     name: node.data.name,

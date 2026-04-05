@@ -90,6 +90,9 @@ export const saveWorkflowAction = createAsyncThunk(
       config: Record<string, unknown>;
       onFailure?: Record<string, unknown>;
       isActive?: boolean;
+      nodeId?: string;
+      position?: { x: number; y: number };
+      editorMeta?: Record<string, unknown>;
     },
     { getState },
   ) => {

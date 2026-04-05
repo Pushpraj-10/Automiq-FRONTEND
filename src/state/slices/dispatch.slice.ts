@@ -78,6 +78,48 @@ const dispatchSlice = createSlice({
     clearError(state) {
       state.error = undefined;
     },
+    applyExecutionRealtimePatch(
+      state,
+      action: { payload: { executionId: string; patch: Partial<DispatchExecution> } },
+    ) {
+      const { executionId, patch } = action.payload;
+
+      if (state.current?.id === executionId) {
+        state.current = {
+          ...state.current,
+          ...patch,
+          id: executionId,
+        };
+      }
+
+      const executionIndex = state.executions.findIndex((item) => item.id === executionId);
+      if (executionIndex >= 0) {
+        state.executions[executionIndex] = {
+          ...state.executions[executionIndex],
+          ...patch,
+          id: executionId,
+        };
+      }
+    },
+    applyExecutionStepRealtimeUpdate(
+      state,
+      action: { payload: { executionId: string; step: ExecutionStep } },
+    ) {
+      const { executionId, step } = action.payload;
+      if (state.current?.id !== executionId) return;
+
+      const stepIndex = state.steps.findIndex((item) => item.stepIndex === step.stepIndex);
+      if (stepIndex >= 0) {
+        state.steps[stepIndex] = {
+          ...state.steps[stepIndex],
+          ...step,
+        };
+      } else {
+        state.steps.push(step);
+      }
+
+      state.steps.sort((a, b) => a.stepIndex - b.stepIndex);
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -109,6 +151,11 @@ const dispatchSlice = createSlice({
   },
 });
 
-export const { clearCurrent, clearError } = dispatchSlice.actions;
+export const {
+  clearCurrent,
+  clearError,
+  applyExecutionRealtimePatch,
+  applyExecutionStepRealtimeUpdate,
+} = dispatchSlice.actions;
 
 export default dispatchSlice.reducer;

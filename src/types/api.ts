@@ -46,6 +46,10 @@ export type ActionCatalogEntry = {
 export type WorkflowAction = {
   id: string;
   workflowId: string;
+  nodeId?: string;
+  positionX?: number;
+  positionY?: number;
+  editorMeta?: Record<string, unknown>;
   stepNumber: number;
   type: ActionType;
   name?: string;

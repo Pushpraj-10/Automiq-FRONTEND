@@ -18,6 +18,7 @@ import {
 type HydratePayload = {
   meta?: WorkflowMeta;
   nodes: WorkflowNode[];
+  revision?: number;
 };
 
 type NodeByIdPayload = {
@@ -65,6 +66,25 @@ type RestoreSnapshotPayload = {
   selectedNodeId?: string;
 };
 
+type ApplyRealtimeStatePayload = {
+  meta?: WorkflowMeta;
+  nodes: WorkflowNode[];
+  viewport?: WorkflowEditorState["viewport"];
+  revision?: number;
+  selectedNodeId?: string;
+};
+
+type ApplyRealtimePatchPayload = {
+  nodes?: WorkflowNode[];
+  viewport?: WorkflowEditorState["viewport"];
+  revision?: number;
+  selectedNodeId?: string;
+};
+
+type AckRealtimeRevisionPayload = {
+  revision: number;
+};
+
 const initialState: WorkflowEditorState = {
   nodes: [],
   edges: [],
@@ -73,6 +93,7 @@ const initialState: WorkflowEditorState = {
     y: 0,
     scale: 1,
   },
+  revision: 0,
   isDirty: false,
   isSaving: false,
 };
@@ -99,9 +120,79 @@ const editorSlice = createSlice({
       state.meta = action.payload.meta;
       state.nodes = nodes;
       state.edges = edges;
+      state.revision = action.payload.revision ?? state.revision ?? 0;
       state.selectedNodeId = nodes[0]?.id;
       state.isDirty = false;
       state.isSaving = false;
+    },
+
+    applyRealtimeEditorState(state, action: PayloadAction<ApplyRealtimeStatePayload>) {
+      const next = resequence(action.payload.nodes);
+      state.nodes = next.nodes;
+      state.edges = next.edges;
+
+      if (action.payload.meta) {
+        state.meta = action.payload.meta;
+      }
+
+      if (action.payload.viewport) {
+        state.viewport = action.payload.viewport;
+      }
+
+      if (action.payload.revision !== undefined) {
+        state.revision = action.payload.revision;
+      }
+
+      const requestedSelectedNodeId = action.payload.selectedNodeId;
+      const selectedExists = requestedSelectedNodeId
+        ? next.nodes.some((node) => node.id === requestedSelectedNodeId)
+        : false;
+
+      if (selectedExists) {
+        state.selectedNodeId = requestedSelectedNodeId;
+      } else if (state.selectedNodeId && !next.nodes.some((node) => node.id === state.selectedNodeId)) {
+        state.selectedNodeId = next.nodes[0]?.id;
+      }
+
+      state.isDirty = false;
+      state.isSaving = false;
+    },
+
+    applyRealtimeEditorPatch(state, action: PayloadAction<ApplyRealtimePatchPayload>) {
+      if (action.payload.nodes) {
+        const next = resequence(action.payload.nodes);
+        state.nodes = next.nodes;
+        state.edges = next.edges;
+
+        if (state.selectedNodeId && !next.nodes.some((node) => node.id === state.selectedNodeId)) {
+          state.selectedNodeId = next.nodes[0]?.id;
+        }
+      }
+
+      if (action.payload.viewport) {
+        state.viewport = action.payload.viewport;
+      }
+
+      if (action.payload.revision !== undefined) {
+        state.revision = action.payload.revision;
+      }
+
+      if (action.payload.selectedNodeId) {
+        const selectedExists = state.nodes.some((node) => node.id === action.payload.selectedNodeId);
+        if (selectedExists) {
+          state.selectedNodeId = action.payload.selectedNodeId;
+        }
+      }
+
+      state.isDirty = false;
+      state.isSaving = false;
+    },
+
+    ackRealtimeEditorRevision(state, action: PayloadAction<AckRealtimeRevisionPayload>) {
+      const currentRevision = state.revision ?? 0;
+      if (action.payload.revision > currentRevision) {
+        state.revision = action.payload.revision;
+      }
     },
 
     setMeta(state, action: PayloadAction<WorkflowMeta>) {
@@ -271,7 +362,6 @@ const editorSlice = createSlice({
 
         return {
           ...node,
-          id: actionId,
           data: {
             ...node.data,
             actionId,
@@ -310,6 +400,9 @@ const editorSlice = createSlice({
 
 export const {
   hydrate,
+  applyRealtimeEditorState,
+  applyRealtimeEditorPatch,
+  ackRealtimeEditorRevision,
   setMeta,
   setMetaName,
   setMetaStatus,

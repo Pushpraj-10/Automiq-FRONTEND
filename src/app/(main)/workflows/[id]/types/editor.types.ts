@@ -52,6 +52,7 @@ export type WorkflowEditorState = {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   viewport: ViewportState;
+  revision?: number;
   selectedNodeId?: string;
   isDirty: boolean;
   isSaving: boolean;
@@ -67,6 +68,9 @@ export type NewNodePayload = {
 
 export type SaveActionInput = {
   id?: string;
+  nodeId?: string;
+  position?: Point;
+  editorMeta?: Record<string, unknown>;
   stepNumber: number;
   type: ActionType;
   name: string;

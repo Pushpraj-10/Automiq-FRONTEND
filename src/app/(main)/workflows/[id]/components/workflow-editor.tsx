@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { Workflow, WorkflowAction, WorkflowValidationResult } from "@/types";
 import { ACTION_PRESETS } from "../data/action-presets";
 import { useNodeDrag } from "../hooks/use-node-drag";
+import { useWorkflowEditorRealtime } from "../hooks/use-workflow-editor-realtime";
 import {
   addNode,
   hydrate,
@@ -56,6 +57,7 @@ export type WorkflowEditorSaveResponse = {
 
 type WorkflowEditorProps = {
   workflowId: string;
+  authToken?: string | null;
   workflow?: Workflow;
   actions: WorkflowAction[];
   isLoading: boolean;
@@ -97,7 +99,7 @@ function isTypingTarget(target: EventTarget | null) {
   return target.isContentEditable;
 }
 
-function WorkflowEditorInner({ workflowId, workflow, actions, isLoading, onSave, onPublish, onValidate }: WorkflowEditorProps) {
+function WorkflowEditorInner({ workflowId, authToken, workflow, actions, isLoading, onSave, onPublish, onValidate }: WorkflowEditorProps) {
   const dispatch = useWorkflowEditorDispatch();
   const editor = useWorkflowEditorSelector((state) => state.editor);
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -131,6 +133,19 @@ function WorkflowEditorInner({ workflowId, workflow, actions, isLoading, onSave,
       }),
     );
   }, [actions, dispatch, isLoading, workflow]);
+
+  useWorkflowEditorRealtime({
+    workflowId,
+    token: authToken,
+    editor,
+    dispatch,
+    enabled: !isLoading,
+    onConflict: (message) => {
+      setErrorMessage(message);
+      setValidationResult(undefined);
+      setLimitMessage(undefined);
+    },
+  });
 
   const selectedNode = useMemo(() => {
     if (!editor.selectedNodeId) return undefined;

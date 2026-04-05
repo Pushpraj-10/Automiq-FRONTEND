@@ -23,6 +23,7 @@ export default function WorkflowBuilderPage() {
   const params = useParams();
   const workflowId = params.id as string;
   const dispatch = useAppDispatch();
+  const authToken = useAppSelector((state) => state.auth.token);
 
   const workflowState = useAppSelector((state) => state.workflows);
   const actionsState = useAppSelector((state) => state.actions);
@@ -80,6 +81,9 @@ export default function WorkflowBuilderPage() {
             config: step.config,
             onFailure: step.onFailure,
             isActive: step.isActive,
+            nodeId: step.nodeId,
+            position: step.position,
+            editorMeta: step.editorMeta,
           }),
         ).unwrap();
 
@@ -134,6 +138,7 @@ export default function WorkflowBuilderPage() {
     <div className="h-full p-0">
       <WorkflowEditor
         workflowId={workflowId}
+        authToken={authToken}
         workflow={workflow}
         actions={actions}
         isLoading={isLoading}

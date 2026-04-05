@@ -43,9 +43,9 @@ export function WorkflowNodeCard({
       }}
       className={cn(
         "group absolute rounded-xl border bg-[#141414] px-4 py-3 text-left shadow-[0_12px_28px_rgba(0,0,0,0.45)] transition-[background-color,border-color,box-shadow]",
-        "hover:border-[#facc15]/40 hover:bg-[#171717]",
-        isSelected ? "border-[#facc15] ring-2 ring-[#facc15]/25" : "border-white/15",
-        "focus-visible:border-[#facc15]/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#facc15]/25",
+        "hover:bg-[#171717]",
+        isSelected ? "ring-1 ring-[#facc15]/50" : "border-white/15",
+        " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#facc15]/25",
         isDragging && "cursor-grabbing",
       )}
       style={{
