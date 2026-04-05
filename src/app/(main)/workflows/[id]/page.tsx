@@ -10,6 +10,7 @@ import {
   saveWorkflowAction,
   validateWorkflow,
 } from "@/state/slices/actions.slice";
+import { enqueueWorkflow as enqueueWorkflowExecution } from "@/state/slices/dispatch.slice";
 import { getWorkflow, updateWorkflow } from "@/state/slices/workflows.slice";
 import {
   WorkflowEditor,
@@ -107,13 +108,35 @@ export default function WorkflowBuilderPage() {
 
   const handlePublish = useCallback(
     async (request: WorkflowEditorSaveRequest) => {
-      return persistWorkflow({
+      const saved = await persistWorkflow({
         ...request,
         status: "active",
       });
+
+      try {
+        const execution = await dispatch(enqueueWorkflowExecution(workflowId)).unwrap();
+        return {
+          ...saved,
+          dispatchExecutionId: execution.id,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to enqueue workflow execution";
+        const partialError = new Error(`Workflow was published, but dispatch failed: ${message}`) as Error & {
+          __kind: "publish_dispatch_partial";
+          steps: WorkflowEditorSaveResponse["steps"];
+        };
+        partialError.__kind = "publish_dispatch_partial";
+        partialError.steps = saved.steps;
+        throw partialError;
+      }
     },
-    [persistWorkflow],
+    [dispatch, persistWorkflow, workflowId],
   );
+
+  const handleRetryDispatch = useCallback(async () => {
+    const execution = await dispatch(enqueueWorkflowExecution(workflowId)).unwrap();
+    return { executionId: execution.id };
+  }, [dispatch, workflowId]);
 
   const handleValidate = useCallback(
     async (request: WorkflowEditorSaveRequest) => {
@@ -144,6 +167,7 @@ export default function WorkflowBuilderPage() {
         isLoading={isLoading}
         onSave={handleSave}
         onPublish={handlePublish}
+        onRetryDispatch={handleRetryDispatch}
         onValidate={handleValidate}
       />
     </div>

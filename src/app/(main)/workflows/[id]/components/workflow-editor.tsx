@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Provider } from "react-redux";
 import { CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
@@ -53,6 +54,7 @@ export type WorkflowEditorSaveRequest = {
 
 export type WorkflowEditorSaveResponse = {
   steps: Array<{ stepNumber: number; id: string }>;
+  dispatchExecutionId?: string;
 };
 
 type WorkflowEditorProps = {
@@ -63,6 +65,7 @@ type WorkflowEditorProps = {
   isLoading: boolean;
   onSave: (request: WorkflowEditorSaveRequest) => Promise<WorkflowEditorSaveResponse>;
   onPublish: (request: WorkflowEditorSaveRequest) => Promise<WorkflowEditorSaveResponse>;
+  onRetryDispatch?: () => Promise<{ executionId: string }>;
   onValidate: (request: WorkflowEditorSaveRequest) => Promise<WorkflowValidationResult>;
 };
 
@@ -71,6 +74,18 @@ type EditorSnapshot = {
   nodes: WorkflowNode[];
   selectedNodeId?: string;
 };
+
+type PublishDispatchPartialError = Error & {
+  __kind?: "publish_dispatch_partial";
+  steps?: WorkflowEditorSaveResponse["steps"];
+};
+
+function isPublishDispatchPartialError(value: unknown): value is PublishDispatchPartialError {
+  if (!(value instanceof Error)) return false;
+
+  const candidate = value as PublishDispatchPartialError;
+  return candidate.__kind === "publish_dispatch_partial" && Array.isArray(candidate.steps);
+}
 
 function deepClone<T>(value: T): T {
   if (value === null || value === undefined) return value;
@@ -99,10 +114,13 @@ function isTypingTarget(target: EventTarget | null) {
   return target.isContentEditable;
 }
 
-function WorkflowEditorInner({ workflowId, authToken, workflow, actions, isLoading, onSave, onPublish, onValidate }: WorkflowEditorProps) {
+function WorkflowEditorInner({ workflowId, authToken, workflow, actions, isLoading, onSave, onPublish, onRetryDispatch, onValidate }: WorkflowEditorProps) {
   const dispatch = useWorkflowEditorDispatch();
   const editor = useWorkflowEditorSelector((state) => state.editor);
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [dispatchExecutionId, setDispatchExecutionId] = useState<string>();
+  const [retryDispatchAvailable, setRetryDispatchAvailable] = useState(false);
+  const [isRetryingDispatch, setIsRetryingDispatch] = useState(false);
   const [limitMessage, setLimitMessage] = useState<string>();
   const [validationResult, setValidationResult] = useState<WorkflowValidationResult>();
   const [isValidating, setIsValidating] = useState(false);
@@ -123,6 +141,9 @@ function WorkflowEditorInner({ workflowId, authToken, workflow, actions, isLoadi
     undoStackRef.current = [];
     setUndoDepth(0);
     setErrorMessage(undefined);
+    setDispatchExecutionId(undefined);
+    setRetryDispatchAvailable(false);
+    setIsRetryingDispatch(false);
     setLimitMessage(undefined);
     setValidationResult(undefined);
     setLastSavedAt(Date.now());
@@ -260,12 +281,41 @@ function WorkflowEditorInner({ workflowId, authToken, workflow, actions, isLoadi
         setLastSavedAt(Date.now());
         setValidationResult(undefined);
         setLimitMessage(undefined);
+        setRetryDispatchAvailable(false);
+
+        if (publish && response.dispatchExecutionId) {
+          setDispatchExecutionId(response.dispatchExecutionId);
+        } else if (!publish) {
+          setDispatchExecutionId(undefined);
+        }
 
         if (request.status !== editor.meta.status) {
           dispatch(setMetaStatus(request.status));
           dispatch(markSaved());
         }
       } catch (error) {
+        if (publish && isPublishDispatchPartialError(error)) {
+          const responseSteps = error.steps || [];
+
+          initialActionIdsRef.current = responseSteps.map((step) => step.id);
+          dispatch(syncSavedActions({ steps: responseSteps }));
+          setLastSavedAt(Date.now());
+          setValidationResult(undefined);
+          setLimitMessage(undefined);
+
+          if (status !== editor.meta.status) {
+            dispatch(setMetaStatus(status));
+            dispatch(markSaved());
+          }
+
+          setDispatchExecutionId(undefined);
+          setRetryDispatchAvailable(true);
+          setErrorMessage(error.message || "Workflow published, but dispatch failed");
+          return;
+        }
+
+        setDispatchExecutionId(undefined);
+        setRetryDispatchAvailable(false);
         dispatch(setSaving(false));
         setErrorMessage(error instanceof Error ? error.message : "Unable to save workflow");
       }
@@ -276,6 +326,24 @@ function WorkflowEditorInner({ workflowId, authToken, workflow, actions, isLoadi
   const handlePublish = useCallback(async () => {
     await runSave("active", true);
   }, [runSave]);
+
+  const handleRetryDispatch = useCallback(async () => {
+    if (!onRetryDispatch) return;
+
+    setIsRetryingDispatch(true);
+    setErrorMessage(undefined);
+
+    try {
+      const result = await onRetryDispatch();
+      setDispatchExecutionId(result.executionId);
+      setRetryDispatchAvailable(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Dispatch retry failed";
+      setErrorMessage(`Workflow is published, but dispatch retry failed: ${message}`);
+    } finally {
+      setIsRetryingDispatch(false);
+    }
+  }, [onRetryDispatch]);
 
   const handleValidate = useCallback(async () => {
     if (!editor.meta) return;
@@ -412,7 +480,35 @@ function WorkflowEditorInner({ workflowId, authToken, workflow, actions, isLoadi
 
       {errorMessage && (
         <div role="alert" className="mx-4 mt-3 rounded-lg border border-red-500/35 bg-red-950/40 px-4 py-2 text-sm text-red-200">
-          {errorMessage}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{errorMessage}</span>
+            {retryDispatchAvailable && onRetryDispatch && (
+              <button
+                type="button"
+                onClick={() => {
+                  void handleRetryDispatch();
+                }}
+                disabled={isRetryingDispatch}
+                className="inline-flex items-center rounded-md border border-red-300/40 bg-red-100/10 px-3 py-1 text-xs font-semibold text-red-100 hover:bg-red-100/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isRetryingDispatch ? "Retrying dispatch..." : "Retry Dispatch"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {dispatchExecutionId && (
+        <div role="status" aria-live="polite" className="mx-4 mt-3 rounded-lg border border-emerald-500/35 bg-emerald-950/40 px-4 py-2 text-sm text-emerald-200">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>Workflow dispatched successfully.</span>
+            <Link
+              href={`/executions/${dispatchExecutionId}`}
+              className="inline-flex items-center rounded-md border border-emerald-300/35 bg-emerald-100/10 px-3 py-1 text-xs font-semibold text-emerald-100 hover:bg-emerald-100/20"
+            >
+              Open Execution Trace
+            </Link>
+          </div>
         </div>
       )}
 

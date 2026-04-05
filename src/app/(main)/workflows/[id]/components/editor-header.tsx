@@ -200,7 +200,7 @@ export function EditorHeader({
           className="h-9 shrink-0 rounded-md bg-[#facc15] px-4 font-semibold text-[#241f16] hover:bg-[#f2c414]"
         >
           <Send className="mr-2 h-4 w-4" />
-          Publish
+          Dispatch
         </Button>
       </div>
     </header>
